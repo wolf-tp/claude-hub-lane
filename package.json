@@ -1,0 +1,46 @@
+{
+  "name": "claude-hub-lane",
+  "version": "0.1.0",
+  "description": "Run many Claude Code sessions as one team: a hub session owns architecture and review, lane sessions implement in their own worktrees, over native cross-session messaging.",
+  "keywords": [
+    "claude",
+    "claude-code",
+    "agent",
+    "multi-agent",
+    "orchestration",
+    "worktree",
+    "skill",
+    "ai",
+    "cli"
+  ],
+  "license": "MIT",
+  "author": "wolf-tp",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wolf-tp/claude-hub-lane.git"
+  },
+  "homepage": "https://github.com/wolf-tp/claude-hub-lane#readme",
+  "bugs": {
+    "url": "https://github.com/wolf-tp/claude-hub-lane/issues"
+  },
+  "type": "module",
+  "bin": {
+    "claude-hub-lane": "bin/cli.mjs"
+  },
+  "files": [
+    "bin/",
+    "assets/",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "scripts": {
+    "test": "bash assets/skills/hub/tests/lane-coord.test.sh && bash assets/skills/hub/tests/lane-gate.test.sh && HUB_LANE_SRC=\"$PWD/assets\" bash assets/skills/hub/tests/install.test.sh"
+  }
+}
