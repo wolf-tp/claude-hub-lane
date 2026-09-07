@@ -21,9 +21,12 @@ tmux orchestrator, no second runtime.
 ## Install
 
 ```bash
-npx claude-hub-lane           # from npm
+npx claude-hub-lane                  # from npm
 npx github:wolf-tp/claude-hub-lane   # straight from this repo, same thing
 ```
+
+[![npm](https://img.shields.io/npm/v/claude-hub-lane)](https://www.npmjs.com/package/claude-hub-lane)
+[![ci](https://github.com/wolf-tp/claude-hub-lane/actions/workflows/ci.yml/badge.svg)](https://github.com/wolf-tp/claude-hub-lane/actions/workflows/ci.yml)
 
 That copies the two skills into `~/.claude/`, adds exactly two keys to `settings.json` (backing it up
 first), and runs the test suites. `npx claude-hub-lane check` reports without writing anything;
