@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # lane-gate.test.sh — run: bash ~/.claude/skills/hub/tests/lane-gate.test.sh
 set -u
-G="$HOME/.claude/bin/lane-gate.py"; T=$(mktemp -d); export HUB_COORD_DIR="$T/coord" HUB_REPO=testrepo; mkdir -p "$HUB_COORD_DIR/lanes"
+G="${LANE_GATE_BIN:-$(cd "$(dirname "$0")/../../../bin" && pwd)/lane-gate.py}"; T=$(mktemp -d); export HUB_COORD_DIR="$T/coord" HUB_REPO=testrepo; mkdir -p "$HUB_COORD_DIR/lanes"
 pass=0; fail=0; ok(){ pass=$((pass+1)); echo "  ok   $1"; }; bad(){ fail=$((fail+1)); echo "  FAIL $1"; echo "       got: $2"; }
 gate(){ # gate <name> <pid> <json>  → sets OUT RC
   OUT=$(printf '%s' "$3" | LANE_GATE_NAME="$1" LANE_GATE_PID="$2" python3 "$G" 2>&1); RC=$?; }

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # lane-coord.test.sh — run: bash ~/.claude/skills/hub/tests/lane-coord.test.sh
 set -u
-S="$HOME/.claude/bin/lane-coord.sh"
+# resolve from the tree this test lives in — the same relative path works in the repo
+# (assets/skills/hub/tests → assets/bin) and after install (~/.claude/skills/hub/tests → ~/.claude/bin)
+S="${LANE_COORD_BIN:-$(cd "$(dirname "$0")/../../../bin" && pwd)/lane-coord.sh}"
 T=$(mktemp -d); export HUB_COORD_DIR="$T/coord"
 pass=0; fail=0
 ok()   { pass=$((pass+1)); echo "  ok   $1"; }

@@ -25,7 +25,8 @@ jobs:
           TMP=$(mktemp -d); export HOME="$TMP"
           npm i -g ./claude-hub-lane-*.tgz --silent
           claude-hub-lane --help
-          claude-hub-lane check && echo "unexpected: check passed before install" && exit 1 || true
+          if claude-hub-lane check >/dev/null 2>&1; then echo "check passed before installing"; exit 1; fi
           claude-hub-lane
           claude-hub-lane check
           test -x "$HOME/.claude/bin/lane-coord.sh"
+          grep -q 'HOME/.claude/bin/lane-gate.py' "$HOME/.claude/settings.json"
