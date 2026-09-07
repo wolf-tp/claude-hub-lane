@@ -21,7 +21,8 @@ tmux orchestrator, no second runtime.
 ## Install
 
 ```bash
-npx claude-hub-lane
+npx claude-hub-lane           # from npm
+npx github:wolf-tp/claude-hub-lane   # straight from this repo, same thing
 ```
 
 That copies the two skills into `~/.claude/`, adds exactly two keys to `settings.json` (backing it up

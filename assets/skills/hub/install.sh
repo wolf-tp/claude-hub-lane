@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# install.sh — cài bộ skill `hub` + `lane` (điều phối nhiều Claude session) sang một máy.
+# install.sh — install the `hub` + `lane` skills (multi-session orchestration) onto a machine.
 #
-#   bash install.sh            cài / cập nhật (idempotent, sao lưu settings trước khi sửa)
-#   bash install.sh --check    chỉ báo cáo, KHÔNG ghi gì
-#   bash install.sh --force    ghi đè cả khi settings đang đặt crossSessionInbound chặt hơn
+#   bash install.sh            install / update (idempotent; backs up settings.json before touching it)
+#   bash install.sh --check    report only, write NOTHING
+#   bash install.sh --force    also relax a stricter crossSessionInbound already in settings.json
 #
-# Nguồn mặc định = thư mục chứa file này. Chép sang máy khác: mang cả cây
+# Source defaults to the tree containing this file. To move it by hand, carry
 # skills/hub + skills/lane + commands/{hub,lane}.md + bin/{lane-coord.sh,lane-gate.py},
-# hoặc chỉ mang skills/hub rồi đặt HUB_LANE_SRC trỏ về một bản ~/.claude đầy đủ.
+# or carry skills/hub alone and point HUB_LANE_SRC at a complete .claude tree.
 #
-# Yêu cầu máy đích: Claude Code >= 2.1.224 (nhắn chéo session), python3, git, bash + ps.
+# Target machine needs: Claude Code >= 2.1.224 (cross-session messaging), python3, git, bash + ps.
 set -u
 
 MODE=install
@@ -18,7 +18,7 @@ for a in "$@"; do
     --check) MODE=check;;
     --force) MODE=force;;
     -h|--help) sed -n '2,14p' "$0"; exit 0;;
-    *) echo "unknown flag: $a (dùng --check | --force)"; exit 2;;
+    *) echo "unknown flag: $a (use --check | --force)"; exit 2;;
   esac
 done
 
@@ -31,16 +31,16 @@ MATCHER='Edit|Write|MultiEdit|NotebookEdit|Bash'
 warn=0
 
 say()  { printf '%s\n' "$*"; }
-fail() { printf 'LỖI: %s\n' "$*" >&2; exit 1; }
+fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
-[ -d "$SRC/skills/hub" ] || fail "không thấy nguồn $SRC/skills/hub — đặt HUB_LANE_SRC trỏ tới thư mục .claude nguồn"
+[ -d "$SRC/skills/hub" ] || fail "source not found at $SRC/skills/hub — point HUB_LANE_SRC at the source .claude directory"
 for f in skills/hub/SKILL.md skills/lane/SKILL.md commands/hub.md commands/lane.md bin/lane-coord.sh bin/lane-gate.py; do
   [ -f "$SRC/$f" ] || fail "thiếu file nguồn: $SRC/$f"
 done
 
-# ---------- phụ thuộc ----------
-command -v python3 >/dev/null || fail "cần python3"
-command -v git >/dev/null     || fail "cần git"
+# ---------- dependencies ----------
+command -v python3 >/dev/null || fail "python3 is required"
+command -v git >/dev/null     || fail "git is required"
 if command -v claude >/dev/null; then
   ver=$(claude --version 2>/dev/null | awk '{print $1}')
   py_ok=$(python3 - "$ver" <<'EOF'
@@ -53,45 +53,45 @@ except Exception:
 EOF
 )
   case "$py_ok" in
-    old) say "⚠ Claude Code $ver < 2.1.224 — nhắn chéo giữa session chưa có; nâng cấp trước khi dùng hub/lane."; warn=1;;
-    unknown) say "⚠ không đọc được phiên bản Claude Code ($ver) — cần >= 2.1.224.";;
+    old) say "⚠ Claude Code $ver < 2.1.224 — cross-session messaging does not exist yet; upgrade before using hub/lane."; warn=1;;
+    unknown) say "⚠ could not read the Claude Code version ($ver) — 2.1.224 or newer is required.";;
   esac
 else
-  say "⚠ không thấy lệnh \`claude\` trên PATH — vẫn cài file, nhưng kiểm lại phiên bản >= 2.1.224."; warn=1
+  say "⚠ no \`claude\` on PATH — installing anyway, but check that the version is >= 2.1.224."; warn=1
 fi
 
-# ---------- báo cáo trạng thái ----------
+# ---------- report current state ----------
 report() {
   local missing=0 f
   for f in skills/hub/SKILL.md skills/lane/SKILL.md commands/hub.md commands/lane.md bin/lane-coord.sh bin/lane-gate.py; do
-    if [ -f "$DST/$f" ]; then say "  có     $f"; else say "  THIẾU  $f"; missing=1; fi
+    if [ -f "$DST/$f" ]; then say "  ok       $f"; else say "  MISSING  $f"; missing=1; fi
   done
   if [ -f "$SETTINGS" ]; then
     python3 - "$SETTINGS" <<'EOF'
 import json,sys
 try: d=json.load(open(sys.argv[1]))
-except Exception as e: print("  settings.json ĐỌC KHÔNG ĐƯỢC:",e); sys.exit(0)
-print("  crossSessionInbound =",d.get("crossSessionInbound") or "(chưa đặt — tin giữa hai lớp permission sẽ bị giữ)")
+except Exception as e: print("  settings.json UNREADABLE:",e); sys.exit(0)
+print("  crossSessionInbound =",d.get("crossSessionInbound") or "(unset — mail across permission classes gets held)")
 n=sum(1 for e in d.get("hooks",{}).get("PreToolUse",[]) for h in e.get("hooks",[]) if "lane-gate" in str(h.get("command","")))
-print("  hook lane-gate      =", f"{n} mục" if n else "CHƯA CẮM")
+print("  lane-gate hook      =", f"{n} entry" if n else "NOT INSTALLED")
 EOF
   else
-    say "  settings.json       = chưa có"; missing=1
+    say "  settings.json       = not present"; missing=1
   fi
   return $missing
 }
 
 if [ "$MODE" = check ]; then
-  say "Kiểm tra cài đặt hub/lane tại $DST"
-  if report; then say; say "Đã cài đủ."; exit 0; else say; say "Chưa cài đủ (missing/not installed) — chạy lại không kèm --check để cài."; exit 1; fi
+  say "Checking the hub/lane installation in $DST"
+  if report; then say; say "Fully installed."; exit 0; else say; say "Not fully installed (missing) — run again without --check to install."; exit 1; fi
 fi
 
-# ---------- chép file ----------
-mkdir -p "$DST/skills/hub/references/adapters" "$DST/skills/hub/tests" "$DST/skills/lane" "$DST/commands" "$DST/bin" || fail "không tạo được thư mục dưới $DST"
-copy() { # copy <đường dẫn tương đối>
+# ---------- copy files ----------
+mkdir -p "$DST/skills/hub/references/adapters" "$DST/skills/hub/tests" "$DST/skills/lane" "$DST/commands" "$DST/bin" || fail "could not create directories under $DST"
+copy() { # copy <relative path>
   [ -f "$SRC/$1" ] || return 0
   mkdir -p "$(dirname "$DST/$1")"
-  cp "$SRC/$1" "$DST/$1" || fail "chép hỏng: $1"
+  cp "$SRC/$1" "$DST/$1" || fail "copy failed: $1"
 }
 for f in \
   skills/hub/SKILL.md skills/hub/DESIGN.md skills/hub/install.sh \
@@ -101,9 +101,9 @@ for f in \
   skills/lane/SKILL.md commands/hub.md commands/lane.md bin/lane-coord.sh bin/lane-gate.py
 do copy "$f"; done
 chmod +x "$DST/bin/lane-coord.sh" "$DST/bin/lane-gate.py" "$DST/skills/hub/install.sh" 2>/dev/null || true
-# Bằng chứng nghiệm thu của máy nguồn KHÔNG đi theo (acceptance-*.md + thư mục bằng chứng).
+# The source machine's acceptance evidence is deliberately NOT shipped.
 
-# ---------- settings: sao lưu rồi merge hai khoá ----------
+# ---------- settings: back up, then merge exactly two keys ----------
 [ -f "$SETTINGS" ] || printf '{}\n' > "$SETTINGS"
 python3 - "$SETTINGS" "$GATE_CMD" "$MATCHER" "$MODE" <<'EOF'
 import json, sys, collections, datetime, shutil, os
@@ -111,9 +111,9 @@ path, gate_cmd, matcher, mode = sys.argv[1:5]
 try:
     with open(path) as f: raw = f.read()
     d = json.loads(raw or "{}", object_pairs_hook=collections.OrderedDict)
-    if not isinstance(d, dict): raise ValueError("settings.json không phải một object JSON")
+    if not isinstance(d, dict): raise ValueError("settings.json is not a JSON object")
 except Exception as e:
-    print(f"LỖI: settings.json hỏng ({e}) — KHÔNG sửa gì. Sửa tay rồi chạy lại.", file=sys.stderr)
+    print(f"ERROR: settings.json is broken ({e}) — nothing was changed. Fix it by hand and rerun.", file=sys.stderr)
     sys.exit(1)
 
 bak = f"{path}.hub-lane-bak-{datetime.datetime.now():%Y%m%d%H%M%S}"
@@ -128,8 +128,8 @@ elif mode == "force":
     changed.append(f"crossSessionInbound {cur!r}→accept (--force)")
     d["crossSessionInbound"] = "accept"
 else:
-    print(f"⚠ giữ nguyên crossSessionInbound={cur!r} (chặt hơn 'accept'): tin giữa các session của bạn sẽ bị hold/refuse.")
-    print("  Muốn hub↔lane nhắn được: chạy lại với --force, hoặc tự đổi khoá này thành \"accept\".")
+    print(f"⚠ keeping crossSessionInbound={cur!r} (stricter than 'accept'): mail between your sessions will be held or refused.")
+    print("  For hub↔lane messaging: rerun with --force, or set that key to \"accept\" yourself.")
 
 hooks = d.setdefault("hooks", collections.OrderedDict())
 pre = hooks.setdefault("PreToolUse", [])
@@ -143,29 +143,29 @@ if not any("lane-gate" in str(h.get("command", "")) for e in pre for h in e.get(
 
 with open(path, "w") as f:
     json.dump(d, f, indent=2, ensure_ascii=False); f.write("\n")
-print("  sao lưu settings →", os.path.basename(bak))
-print("  settings:", ", ".join(changed) if changed else "đã đúng, không đổi gì")
+print("  settings backed up →", os.path.basename(bak))
+print("  settings:", ", ".join(changed) if changed else "already correct, nothing changed")
 EOF
 rc=$?; [ $rc = 0 ] || exit $rc
 
-# ---------- V8: đo lại, đừng tin thao tác ----------
-say "Kiểm lại sau khi ghi:"
+# ---------- measure again; never trust the write ----------
+say "Re-measured after writing:"
 report || true
 python3 - "$SETTINGS" <<'EOF'
 import json,sys
 d=json.load(open(sys.argv[1]))
 bad=[h["command"] for e in d.get("hooks",{}).get("PreToolUse",[]) for h in e.get("hooks",[])
      if "lane-gate" in str(h.get("command","")) and "$HOME" not in h["command"]]
-if bad: print("⚠ hook lane-gate đang ghi đường dẫn tuyệt đối:", bad, "— sửa thành $HOME để chuyển máy được.")
+if bad: print("⚠ the lane-gate hook holds an absolute path:", bad, "— use $HOME so it survives a machine move.")
 EOF
 
 # ---------- test ----------
 if [ -f "$DST/skills/hub/tests/lane-coord.test.sh" ] && [ -f "$DST/skills/hub/tests/lane-gate.test.sh" ]; then
-  say "Chạy test:"
+  say "Running the test suites:"
   a=$(bash "$DST/skills/hub/tests/lane-coord.test.sh" 2>&1 | tail -1)
   b=$(bash "$DST/skills/hub/tests/lane-gate.test.sh"  2>&1 | tail -1)
   say "  lane-coord: $a"; say "  lane-gate : $b"
-  case "$a$b" in *failed=0*failed=0*) ;; *) fail "test không xanh — xem lại trước khi dùng";; esac
+  case "$a$b" in *failed=0*failed=0*) ;; *) fail "tests are not green — look before you use this";; esac
 fi
 
 say
